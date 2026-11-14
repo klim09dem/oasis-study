@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Исследование восприятия изображений (OASIS)</title>
+  <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%232C3E50'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ЭКРАН 1: ИНСТРУКЦИЯ И СТАРТ -->
+  <main id="screen-intro" class="screen active">
+    <div class="intro-container">
+      <h1>Оценка визуальных стимулов (протокол OASIS)</h1>
+      
+      <section class="instruction-card">
+        <h2>Инструкция для участника</h2>
+        <p>
+          В этом исследовании вам предстоит оценить <strong>60 изображений</strong> по двум независимым 7-балльным шкалам: 
+          <strong>Валентность</strong> и <strong>Возбуждение</strong>. Здесь нет правильных или неправильных ответов — нам важно ваше личное восприятие. 
+          Пожалуйста, не раздумывайте над каждой картинкой слишком долго: ваша первая эмоциональная реакция — самая точная. 
+          Старайтесь использовать весь диапазон шкалы от 1 до 7.
+        </p>
+        <p class="tooltip-hint-intro">
+          Если во время оценки изображений вы забудете значение какой-либо из шкал, наведите курсор на значок <strong>[?]</strong> в правом углу над соответствующей шкалой, чтобы открыть краткую подсказку.
+        </p>
+
+        <div class="scales-explanation">
+          <div class="explanation-box">
+            <h3>1. Валентность (знак эмоции)</h3>
+            <p>Оцените, насколько приятное (позитивное) или неприятное (негативное) чувство вызывает у вас изображение:</p>
+            <ul>
+              <li><strong>Слева (1–3):</strong> отрицательные эмоции — грусть, злость, страх, раздражение, тревога, отвращение или подавленность.</li>
+              <li><strong>Посередине (4 — Нейтральная):</strong> изображение не вызывает ни положительных, ни отрицательных чувств.</li>
+              <li><strong>Справа (5–7):</strong> положительные эмоции — радость, счастье, удовольствие, умиление, гордость или восторг.</li>
+            </ul>
+          </div>
+
+          <div class="explanation-box">
+            <h3>2. Возбуждение (интенсивность / сила эмоции)</h3>
+            <p>Оцените, насколько сильный, интенсивный эмоциональный отклик вызывает изображение — от полного спокойствия до сильной взбудораженности:</p>
+            <ul>
+              <li><strong>Слева (1–3):</strong> состояние спокойствия, расслабленности, умиротворения, пассивности или скуки.</li>
+              <li><strong>Посередине (4 — Умеренное):</strong> средний, умеренный по силе эмоциональный отклик.</li>
+              <li><strong>Справа (5–7):</strong> сильное эмоциональное напряжение, взбудораженность, настороженность, бодрость или сильный всплеск эмоций.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="important-notice">
+          <div class="notice-title">Важно: Валентность и Возбуждение не зависят друг от друга!</div>
+          <p>
+            При оценке возбуждения не нужно учитывать, хорошая картинка или плохая. Например, фотография спортсмена, выигравшего золотую медаль (очень позитивная), и фотография спортсмена, получившего тяжелую травму (очень негативная), имеют противоположный знак валентности, но обе могут вызывать <strong>одинаково высокий уровень возбуждения (6–7)</strong>, так как вызывают сильный эмоциональный отклик.
+          </p>
+        </div>
+
+        <h3>Расшифровка всех значений шкал</h3>
+        <div class="table-wrapper">
+          <table class="scales-table">
+            <thead>
+              <tr>
+                <th>Балл</th>
+                <th>Шкала 1: Валентность (знак эмоции)</th>
+                <th>Шкала 2: Возбуждение (сила эмоции)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="score-cell">1</td>
+                <td>Очень негативная</td>
+                <td>Очень низкое</td>
+              </tr>
+              <tr>
+                <td class="score-cell">2</td>
+                <td>Умеренно негативная</td>
+                <td>Умеренно низкое</td>
+              </tr>
+              <tr>
+                <td class="score-cell">3</td>
+                <td>Слегка негативная</td>
+                <td>Слегка низкое</td>
+              </tr>
+              <tr class="neutral-row">
+                <td class="score-cell">4</td>
+                <td><strong>Нейтральная</strong></td>
+                <td><strong>Умеренное</strong></td>
+              </tr>
+              <tr>
+                <td class="score-cell">5</td>
+                <td>Слегка позитивная</td>
+                <td>Слегка высокое</td>
+              </tr>
+              <tr>
+                <td class="score-cell">6</td>
+                <td>Умеренно позитивная</td>
+                <td>Умеренно высокое</td>
+              </tr>
+              <tr>
+                <td class="score-cell">7</td>
+                <td>Очень позитивная</td>
+                <td>Очень высокое</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="break-info-box">
+          <div>
+            <h3>Структура исследования и перерыв</h3>
+            <p>
+              Исследование состоит из 2 блоков по 30 картинок. На каждую картинку необходимо смотреть минимум 1,5 секунды, после чего станет доступна кнопка «Далее». Между первым и вторым блоком предусмотрен обязательный перерыв на 1 минуту, чтобы дать глазам отдохнуть — по его окончании прозвучит мягкий звуковой сигнал.
+            </p>
+          </div>
+          <button type="button" id="btn-test-sound" class="btn-secondary">
+            ▶ Прослушать звуковой сигнал
+          </button>
+        </div>
+
+        <div class="content-warning-box">
+          <h3>Предупреждение о содержании материалов</h3>
+          <p>
+            В исследовании используются изображения из международной научной базы, охватывающие широкий спектр жизненных ситуаций. Среди них могут встречаться неприятные или эмоционально тяжелые кадры (например, сцены травм, болезней, несчастных случаев или страданий животных). Участие является полностью добровольным: если во время просмотра вы почувствуете дискомфорт, вы можете в любой момент прекратить прохождение, просто закрыв страницу. Нажимая кнопку «Начать исследование», вы подтверждаете, что вам исполнилось 18 лет и вы согласны принять участие в исследовании.
+          </p>
+        </div>
+      </section>
+
+      <section class="form-card">
+        <h2>Данные участника</h2>
+        <form id="start-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ваш пол:</label>
+              <div class="radio-group">
+                <label class="radio-card">
+                  <input type="radio" name="gender" value="Мужской" required>
+                  <span>Мужской</span>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="gender" value="Женский" required>
+                  <span>Женский</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="age-input">Ваш возраст (полных лет):</label>
+              <input type="number" id="age-input" name="age" min="18" max="100" placeholder="Например, 23" required>
+            </div>
+          </div>
+
+          <div id="form-error" class="form-error" hidden>
+            Пожалуйста, укажите ваш пол и корректный возраст (от 18 до 100 лет).
+          </div>
+
+          <div class="start-actions">
+            <button type="submit" id="btn-start" class="btn-primary btn-large">
+              Начать исследование
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 2: ПРЕДЪЯВЛЕНИЕ СТИМУЛА (100dvh, без скролла) -->
+  <main id="screen-stimulus" class="screen">
+    <div class="stimulus-layout">
+      <!-- 1. Верхняя полоса прогресса -->
+      <header class="top-progress-bar">
+        <div class="progress-info">
+          <span id="progress-text">Блок 1 из 2 • Картинка 1 из 30</span>
+        </div>
+        <div class="progress-track">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <button type="button" id="btn-admin-reset" class="btn-admin-reset" title="Сбросить сессию и вернуться к инструкции (Alt + Backspace)" hidden>
+          ↺ К инструкции
+        </button>
+      </header>
+
+      <!-- 2. Стимул по центру сверху -->
+      <div class="image-stage">
+        <div class="image-square-box">
+          <img id="stimulus-image" src="" alt="Стимул">
+          <div id="image-fallback" class="image-fallback" hidden>
+            <span id="image-fallback-text"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Блоки шкал оценки -->
+      <div class="scales-stage">
+        <!-- Шкала 1: Валентность -->
+        <section class="scale-block">
+          <div class="scale-title-row">
+            <span class="scale-title">Валентность</span>
+            <div class="tooltip-wrapper">
+              <button type="button" class="tooltip-trigger" aria-label="Подсказка по шкале Валентность">[?]</button>
+              <div class="popover-box">
+                <strong>Валентность — знак эмоции (приятно / неприятно)</strong>
+                <p>Оцените, насколько приятные или неприятные чувства вызывает изображение:</p>
+                <ul>
+                  <li><b>1 (Очень негативная):</b> сильная грусть, страх, злость, отвращение.</li>
+                  <li><b>4 (Нейтральная):</b> ни позитивная, ни негативная эмоция.</li>
+                  <li><b>7 (Очень позитивная):</b> сильная радость, счастье, удовольствие, восторг.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="scale-anchors-row">
+            <span class="anchor-side anchor-left">Очень негативная</span>
+            <span id="valence-selected-label" class="anchor-center-selected"></span>
+            <span class="anchor-side anchor-right">Очень позитивная</span>
+          </div>
+
+          <div class="scale-buttons-row" id="valence-buttons" role="radiogroup" aria-label="Шкала валентности">
+            <button type="button" class="scale-btn" data-scale="valence" data-value="1">1</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="2">2</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="3">3</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="4">4</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="5">5</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="6">6</button>
+            <button type="button" class="scale-btn" data-scale="valence" data-value="7">7</button>
+          </div>
+        </section>
+
+        <!-- Шкала 2: Возбуждение -->
+        <section class="scale-block">
+          <div class="scale-title-row">
+            <span class="scale-title">Возбуждение</span>
+            <div class="tooltip-wrapper">
+              <button type="button" class="tooltip-trigger" aria-label="Подсказка по шкале Возбуждение">[?]</button>
+              <div class="popover-box">
+                <strong>Возбуждение — интенсивность / сила эмоции</strong>
+                <p>Насколько сильный эмоциональный отклик вызывает картинка (независимо от её знака):</p>
+                <ul>
+                  <li><b>1 (Очень низкое):</b> полное спокойствие, расслабленность, умиротворение.</li>
+                  <li><b>4 (Умеренное):</b> средний по силе эмоциональный отклик.</li>
+                  <li><b>7 (Очень высокое):</b> сильная взбудораженность, напряжение, эмоциональный подъем.</li>
+                </ul>
+                <p class="popover-example">
+                  <em>Пример: и победа спортсмена (золотая медаль), и тяжелая травма спортсмена имеют разную валентность, но обе могут вызывать одинаково высокое возбуждение (6–7).</em>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="scale-anchors-row">
+            <span class="anchor-side anchor-left">Очень низкое</span>
+            <span id="arousal-selected-label" class="anchor-center-selected"></span>
+            <span class="anchor-side anchor-right">Очень высокое</span>
+          </div>
+
+          <div class="scale-buttons-row" id="arousal-buttons" role="radiogroup" aria-label="Шкала возбуждения">
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="1">1</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="2">2</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="3">3</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="4">4</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="5">5</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="6">6</button>
+            <button type="button" class="scale-btn" data-scale="arousal" data-value="7">7</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- 4. Кнопка «Далее» внизу -->
+      <footer class="bottom-action-bar">
+        <button type="button" id="btn-next" class="btn-primary btn-next" disabled>
+          Далее
+        </button>
+      </footer>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 3: ОБЯЗАТЕЛЬНЫЙ ПЕРЕРЫВ -->
+  <main id="screen-break" class="screen">
+    <div class="center-card">
+      <div class="badge-break">Перерыв • Блок 1 завершен</div>
+      <h2>Время для отдыха</h2>
+      <p class="break-text">
+        Вы завершили первую половину исследования (30 из 60 изображений). Пожалуйста, сделайте небольшой перерыв на 1 минуту, чтобы дать глазам отдохнуть и нивелировать влияние усталости. Через 1 минуту прозвучит звуковой сигнал, и вы сможете продолжить.
+      </p>
+
+      <div class="timer-display" id="break-timer">01:00</div>
+
+      <p id="break-status-hint" class="break-hint">
+        Не закрывайте браузер — по окончании таймера прозвучит сигнал, а вкладка напомнит о себе.
+      </p>
+
+      <button type="button" id="btn-continue" class="btn-primary btn-large" disabled>
+        Продолжить исследование
+      </button>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 4: ФИНАЛ (только благодарность, все ответы автоматически уходят в Google Таблицу) -->
+  <main id="screen-final" class="screen">
+    <div class="center-card">
+      <div class="success-icon">✓</div>
+      <h2>Спасибо за участие в исследовании!</h2>
+      <p class="final-text" style="margin-bottom: 0;">
+        Ваши ответы успешно сохранены. Вы оценили все 60 изображений и внесли важный вклад в подготовку научной базы визуальных стимулов. Теперь вы можете закрыть эту вкладку.
+      </p>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
