@@ -24,10 +24,10 @@ const AROUSAL_LABELS = {
 
 // Ключ сессии обновлен на v2, чтобы автоматически сбросить старый кеш и подгрузить новые папки group_1 и group_2
 const STORAGE_KEYS = {
-  SESSION: "oasis_active_session_v3",
-  COMPLETED: "oasis_is_completed_v3",
-  LOCAL_COUNTERS: "oasis_local_counters_v3",
-  LOCAL_RESPONSES: "oasis_local_responses_v3"
+  SESSION: "oasis_active_session_v4",
+  COMPLETED: "oasis_is_completed_v4",
+  LOCAL_COUNTERS: "oasis_local_counters_v4",
+  LOCAL_RESPONSES: "oasis_local_responses_v4"
 };
 
 const DEFAULT_FAVICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%232C3E50'/></svg>";
@@ -64,21 +64,21 @@ function getCandidateImagePaths(trialObj) {
   const fileName = trialObj.imageName;
   const folder = trialObj.group === "A" ? "group_1" : "group_2";
   const baseName = fileName.replace(/\.(jpeg|jpg)$/i, "");
-  const encodedJpeg = encodeURIComponent(baseName + ".jpeg");
   const encodedJpg = encodeURIComponent(baseName + ".jpg");
+  const encodedJpeg = encodeURIComponent(baseName + ".jpeg");
 
-  // Если в имени есть опечатка Gorrila / Gorilla, добавим и второй вариант на всякий случай
+  // Сначала проверяем .jpg (стандарт базы OASIS), чтобы браузер не писал 404 на .jpeg в консоль
   const paths = [
-    `images/${folder}/${encodedJpeg}`,
     `images/${folder}/${encodedJpg}`,
-    `images/${encodedJpeg}`,
-    `images/${encodedJpg}`
+    `images/${folder}/${encodedJpeg}`,
+    `images/${encodedJpg}`,
+    `images/${encodedJpeg}`
   ];
 
   if (/Gorrila/i.test(baseName)) {
     const altBase = baseName.replace(/Gorrila/i, "Gorilla");
-    paths.push(`images/${folder}/${encodeURIComponent(altBase + ".jpeg")}`);
     paths.push(`images/${folder}/${encodeURIComponent(altBase + ".jpg")}`);
+    paths.push(`images/${folder}/${encodeURIComponent(altBase + ".jpeg")}`);
   }
 
   return paths;
@@ -771,6 +771,7 @@ function saveTrialResponse(record) {
     fetch(scriptUrl, {
       method: "POST",
       mode: "no-cors",
+      keepalive: true,
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
