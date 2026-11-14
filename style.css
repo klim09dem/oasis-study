@@ -688,6 +688,7 @@ html, body {
 /* =========================================================
    ЭКРАН 3 (ПЕРЕРЫВ) И ЭКРАН 4 (ФИНАЛ)
    ========================================================= */
+#screen-mobile-block.active,
 #screen-break.active,
 #screen-final.active {
   min-height: 100dvh;
@@ -779,4 +780,17 @@ html, body {
   color: var(--text-muted);
   margin-bottom: 16px;
   line-height: 1.5;
+}
+
+.mobile-block-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  font-size: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
 }

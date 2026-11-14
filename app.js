@@ -51,6 +51,29 @@ const urlParams = new URLSearchParams(window.location.search);
 const isUrlTestMode = urlParams.get("test") === "1";
 const isUrlFastMode = urlParams.get("fast") === "1";
 
+/**
+ * Надежное определение смартфонов и планшетов (включая iPad с iPadOS 13+, который маскируется под Mac в User-Agent)
+ * Настоящие Mac (MacBook / iMac) в Safari имеют navigator.maxTouchPoints === 0 и спокойно проходят проверку.
+ */
+function isMobileOrTabletDevice() {
+  if (isUrlTestMode) {
+    return false; // Разрешаем исследователю при необходимости открыть по ссылке с ?test=1
+  }
+
+  const ua = navigator.userAgent || "";
+
+  // 1. Классические смартфоны и планшеты (iPhone, Android, iPod, старые iPad, мобильные браузеры)
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua);
+
+  // 2. iPad на iPadOS 13+ в Safari представляется как Macintosh, но имеет мультитач-экран (maxTouchPoints > 1)
+  const isIPadOS = (navigator.platform === "MacIntel" || /Macintosh/i.test(ua)) && navigator.maxTouchPoints > 1;
+
+  // 3. Дополнительная проверка на сенсорные экраны с узким экраном
+  const isSmallTouchScreen = window.matchMedia("(pointer: coarse)").matches && Math.min(window.screen.width, window.screen.height) < 900;
+
+  return isMobileUA || isIPadOS || isSmallTouchScreen;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
   restoreOrInitApp();
@@ -196,6 +219,11 @@ function resetProgressToIntro() {
  * Восстановление незавершенной сессии при перезагрузке или показ стартового экрана
  */
 function restoreOrInitApp() {
+  if (isMobileOrTabletDevice()) {
+    showScreen("screen-mobile-block");
+    return;
+  }
+
   if (isUrlTestMode) {
     const saved = loadSession();
     if (saved && saved.isAdminTest && !saved.isFinished) {
@@ -239,6 +267,11 @@ function resumeSessionState() {
  */
 async function handleStartSubmit(event) {
   event.preventDefault();
+
+  if (isMobileOrTabletDevice()) {
+    showScreen("screen-mobile-block");
+    return;
+  }
 
   const genderInput = document.querySelector('input[name="gender"]:checked');
   const ageInput = document.getElementById("age-input");
