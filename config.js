@@ -1,31 +1,31 @@
 const CONFIG = {
-  // Вставьте сюда ссылку на развернутый веб-скрипт Google Таблицы (между кавычками):
+  // Ссылка на развернутый веб-скрипт Google Таблицы:
   GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxJoNsQeQgdDl9mkkQx1JzoEXspOWRZSrfL5u0ZikKmGHBpaykyi2ZiXmThJlJ-5vis/exec",
 
   BREAK_DURATION_SEC: 60, // 1 минута (60 сек)
   MIN_VIEW_TIME_MS: 1500, // 1,5 секунды (1500 мс) до разблокировки кнопки "Далее"
 
-  // Группа 1 (папка images/group_1/)
+  // Группа 1 (папка images/group_1/) — основное расширение .jpg (чтобы не было 404 в консоли)
   GROUP_A: [
-    "Bed 1.jpeg", "Bird 3.jpeg", "Bloody knife 1.jpeg", "Boxing 2.jpeg",
-    "Bubble 2.jpeg", "Cotton swabs 2.jpeg", "Depressed face 1.jpeg", "Depressed pose 1.jpeg",
-    "Drink 1.jpeg", "Fireman 1.jpeg", "Fireworks 7.jpeg", "Flowers 6.jpeg",
-    "Guitar 1.jpeg", "Horse racing 1.jpeg", "Lake 9.jpeg", "Lamb 1.jpeg",
-    "Lion 1.jpeg", "Miserable pose 3.jpeg", "Motocross 1.jpeg", "Parachuting 1.jpeg",
-    "Path 1.jpeg", "Plane crash 4.jpeg", "Prison 2.jpeg", "Rock climbing 1.jpeg",
-    "Rollercoaster 3.jpeg", "Shark 4.jpeg", "Skier 1.jpeg", "Sun 1.jpeg",
-    "Thunderstorm 7.jpeg", "Timber 4.jpeg"
+    "Bed 1.jpg", "Bird 3.jpg", "Bloody knife 1.jpg", "Boxing 2.jpg",
+    "Bubble 2.jpg", "Cotton swabs 2.jpg", "Depressed face 1.jpg", "Depressed pose 1.jpg",
+    "Drink 1.jpg", "Fireman 1.jpg", "Fireworks 7.jpg", "Flowers 6.jpg",
+    "Guitar 1.jpg", "Horse racing 1.jpg", "Lake 9.jpg", "Lamb 1.jpg",
+    "Lion 1.jpg", "Miserable pose 3.jpg", "Motocross 1.jpg", "Parachuting 1.jpg",
+    "Path 1.jpg", "Plane crash 4.jpg", "Prison 2.jpg", "Rock climbing 1.jpg",
+    "Rollercoaster 3.jpg", "Shark 4.jpg", "Skier 1.jpg", "Sun 1.jpg",
+    "Thunderstorm 7.jpg", "Timber 4.jpg"
   ],
 
-  // Группа 2 (папка images/group_2/)
+  // Группа 2 (папка images/group_2/) — основное расширение .jpg
   GROUP_B: [
-    "Acorns 2.jpeg", "Bear 3.jpeg", "Bee 1.jpeg", "Billiards 1.jpeg",
-    "Candle 1.jpeg", "Car race 2.jpeg", "Cat 5.jpeg", "Dessert 5.jpeg",
-    "Dock 1.jpeg", "Dog 26.jpeg", "Fire 9.jpeg", "Gorrila 1.jpeg",
-    "Hang gliding 3.jpeg", "Hangover 1.jpeg", "Horse 1.jpeg", "Moon 1.jpeg",
-    "Power lines 1.jpeg", "Rooster 1.jpeg", "Satellite 1.jpeg", "Siblings 1.jpeg",
-    "Skijump 2.jpeg", "Sky 1.jpeg", "Socks 1.jpeg", "Spider 2.jpeg",
-    "Stingray 2.jpeg", "Sunflower 1.jpeg", "Tornado 1.jpeg", "Weapon 1.jpeg",
-    "Windmill 1.jpeg", "Yarn 2.jpeg"
+    "Acorns 2.jpg", "Bear 3.jpg", "Bee 1.jpg", "Billiards 1.jpg",
+    "Candle 1.jpg", "Car race 2.jpg", "Cat 5.jpg", "Dessert 5.jpg",
+    "Dock 1.jpg", "Dog 26.jpg", "Fire 9.jpg", "Gorrila 1.jpg",
+    "Hang gliding 3.jpg", "Hangover 1.jpg", "Horse 1.jpg", "Moon 1.jpg",
+    "Power lines 1.jpg", "Rooster 1.jpg", "Satellite 1.jpg", "Siblings 1.jpg",
+    "Skijump 2.jpg", "Sky 1.jpg", "Socks 1.jpg", "Spider 2.jpg",
+    "Stingray 2.jpg", "Sunflower 1.jpg", "Tornado 1.jpg", "Weapon 1.jpg",
+    "Windmill 1.jpg", "Yarn 2.jpg"
   ]
 };
