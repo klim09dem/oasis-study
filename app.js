@@ -757,7 +757,10 @@ function stopTabBlinking() {
 }
 
 /**
- * СТРОГАЯ ПРОВЕРКА ПОДКЛЮЧЕНИЯ К GOOGLE ТАБЛИЦЕ ПЕРЕД СТАРТОМ (с советом открыть режим Инкогнито)
+ * МЯГКАЯ ПРОВЕРКА ПОДКЛЮЧЕНИЯ К GOOGLE ТАБЛИЦЕ ПЕРЕД СТАРТОМ
+ * Если Google Таблица доступна — берем точные счетчики из нее.
+ * Если у участника стоит AdBlock / прокси, который режет Google Таблицы — НЕ блокируем участника
+ * и не требуем Инкогнито, а выбираем группу 50/50 и в конце автоматически отправляем ответы на почту через Web3Forms.
  */
 async function getGroupCountersStrict() {
   const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
@@ -770,7 +773,7 @@ async function getGroupCountersStrict() {
   const pingUrl = `${scriptUrl}${separator}check=1&t=${Date.now()}`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 4500); // Ждем максимум 4.5 сек, чтобы старт был быстрым
 
   try {
     const response = await fetch(pingUrl, {
@@ -794,11 +797,8 @@ async function getGroupCountersStrict() {
     return { countA: data.countA, countB: data.countB };
   } catch (err) {
     clearTimeout(timeoutId);
-    console.error("Ошибка проверки связи с Google Таблицей:", err);
-    throw new Error(
-      "Не удалось подключиться к базе исследования (соединение блокируется расширением вашего браузера, например AdBlock или прокси). " +
-      "Чтобы ничего не настраивать, просто откройте эту ссылку в режиме «Инкогнито» (нажмите Ctrl + Shift + N на Windows или Cmd + Shift + N на Mac), где расширения отключены по умолчанию."
-    );
+    console.warn("Доступ к Google Таблице ограничен браузером участника. Запускаем тест со случайным выбором первой группы (50/50) и резервной отправкой на почту:", err);
+    return { countA: 0, countB: 0 };
   }
 }
 
@@ -894,13 +894,14 @@ async function syncBlockRecords(startTrial, endTrial, incrementGroup) {
   }
 
   // Если Google Таблица не приняла блок — отправляем резервное письмо через Web3Forms
-  // (В финале после 60-й картинки отправляем сразу все 60 строк участника, если Блок 1 тоже не дошел в таблицу)
-  const recordsForEmail =
-    endTrial === 60 && !currentSession.block1Synced
-      ? getParticipantRecordsInRange(1, 60)
-      : records;
+  // (В финале после 60-й картинки отправляем сразу все 60 строк участника одним письмом, если Блок 1 тоже не дошел в таблицу)
+  const isFull60Fallback = endTrial === 60 && !currentSession.block1Synced;
+  const recordsForEmail = isFull60Fallback
+    ? getParticipantRecordsInRange(1, 60)
+    : records;
+  const emailLabel = isFull60Fallback ? "ПОЛНЫЕ 60 СТРОК (Блок 1 + Блок 2)" : blockLabel;
 
-  await sendBackupEmailViaWeb3Forms(recordsForEmail, blockLabel);
+  await sendBackupEmailViaWeb3Forms(recordsForEmail, emailLabel);
 }
 
 /**
