@@ -1,5 +1,6 @@
 /**
  * Логика веб-приложения для нормирования стимулов по протоколу OASIS (Kurdi et al., 2017)
+ * Версия с обязательной проверкой связи с Google Таблицами перед стартом и защитой от потери ответов
  */
 
 const VALENCE_LABELS = {
@@ -22,12 +23,12 @@ const AROUSAL_LABELS = {
   7: "Очень высокое"
 };
 
-// Ключ сессии обновлен на v2, чтобы автоматически сбросить старый кеш и подгрузить новые папки group_1 и group_2
 const STORAGE_KEYS = {
   SESSION: "oasis_active_session_v4",
   COMPLETED: "oasis_is_completed_v4",
   LOCAL_COUNTERS: "oasis_local_counters_v4",
-  LOCAL_RESPONSES: "oasis_local_responses_v4"
+  LOCAL_RESPONSES: "oasis_local_responses_v4",
+  PENDING_QUEUE: "oasis_pending_queue_v4"
 };
 
 const DEFAULT_FAVICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%232C3E50'/></svg>";
@@ -45,6 +46,7 @@ let minViewTimerId = null;
 let breakIntervalId = null;
 let titleBlinkIntervalId = null;
 let audioCtx = null;
+let isSubmittingTrial = false;
 
 // Параметры URL (?test=1 и ?fast=1)
 const urlParams = new URLSearchParams(window.location.search);
@@ -57,18 +59,12 @@ const isUrlFastMode = urlParams.get("fast") === "1";
  */
 function isMobileOrTabletDevice() {
   if (isUrlTestMode) {
-    return false; // Разрешаем исследователю при необходимости открыть по ссылке с ?test=1
+    return false;
   }
 
   const ua = navigator.userAgent || "";
-
-  // 1. Классические смартфоны и планшеты (iPhone, Android, iPod, старые iPad, мобильные браузеры)
   const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua);
-
-  // 2. iPad на iPadOS 13+ в Safari представляется как Macintosh, но имеет мультитач-экран (maxTouchPoints > 1)
   const isIPadOS = (navigator.platform === "MacIntel" || /Macintosh/i.test(ua)) && navigator.maxTouchPoints > 1;
-
-  // 3. Дополнительная проверка на сенсорные экраны с узким экраном
   const isSmallTouchScreen = window.matchMedia("(pointer: coarse)").matches && Math.min(window.screen.width, window.screen.height) < 900;
 
   return isMobileUA || isIPadOS || isSmallTouchScreen;
@@ -81,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 /**
  * Формирование списка кандидатов путей для картинки с учетом подпапок group_1 / group_2
- * и автоматического перебора расширений (.jpeg / .jpg)
+ * и автоматического перебора расширений (.jpg / .jpeg)
  */
 function getCandidateImagePaths(trialObj) {
   const fileName = trialObj.imageName;
@@ -90,7 +86,6 @@ function getCandidateImagePaths(trialObj) {
   const encodedJpg = encodeURIComponent(baseName + ".jpg");
   const encodedJpeg = encodeURIComponent(baseName + ".jpeg");
 
-  // Сначала проверяем .jpg (стандарт базы OASIS), чтобы браузер не писал 404 на .jpeg в консоль
   const paths = [
     `images/${folder}/${encodedJpg}`,
     `images/${folder}/${encodedJpeg}`,
@@ -111,7 +106,6 @@ function getCandidateImagePaths(trialObj) {
  * Инициализация всех обработчиков событий
  */
 function initEventListeners() {
-  // Кнопка проверки звука на стартовом экране
   const btnTestSound = document.getElementById("btn-test-sound");
   if (btnTestSound) {
     btnTestSound.addEventListener("click", () => {
@@ -119,13 +113,11 @@ function initEventListeners() {
     });
   }
 
-  // Форма старта
   const startForm = document.getElementById("start-form");
   if (startForm) {
     startForm.addEventListener("submit", handleStartSubmit);
   }
 
-  // Кнопки шкал (Валентность и Возбуждение)
   const scaleButtons = document.querySelectorAll(".scale-btn");
   scaleButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -135,7 +127,6 @@ function initEventListeners() {
     });
   });
 
-  // Поддержка клика по [?] для мобильных/тачпадов
   const tooltipTriggers = document.querySelectorAll(".tooltip-trigger");
   tooltipTriggers.forEach((trigger) => {
     trigger.addEventListener("click", (e) => {
@@ -153,31 +144,26 @@ function initEventListeners() {
     document.querySelectorAll(".tooltip-wrapper.open").forEach((w) => w.classList.remove("open"));
   });
 
-  // Кнопка «Далее»
   const btnNext = document.getElementById("btn-next");
   if (btnNext) {
     btnNext.addEventListener("click", handleNextTrial);
   }
 
-  // Кнопка «Продолжить» после перерыва
   const btnContinue = document.getElementById("btn-continue");
   if (btnContinue) {
     btnContinue.addEventListener("click", handleBreakContinue);
   }
 
-  // Кнопка скачивания CSV в финале
   const btnDownloadCsv = document.getElementById("btn-download-csv");
   if (btnDownloadCsv) {
     btnDownloadCsv.addEventListener("click", downloadLocalCsv);
   }
 
-  // Кнопка быстрого возврата к инструкции (видна только в режиме теста: возраст 100 или ?test=1)
   const btnAdminReset = document.getElementById("btn-admin-reset");
   if (btnAdminReset) {
     btnAdminReset.addEventListener("click", resetProgressToIntro);
   }
 
-  // Скрытая комбинация клавиш для исследователя: Alt + Backspace (в любом режиме возвращает на экран инструкции)
   document.addEventListener("keydown", (e) => {
     if (e.altKey && e.key === "Backspace") {
       e.preventDefault();
@@ -185,7 +171,6 @@ function initEventListeners() {
     }
   });
 
-  // Остановка мигания вкладки при возвращении пользователя
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       stopTabBlinking();
@@ -218,11 +203,14 @@ function resetProgressToIntro() {
 /**
  * Восстановление незавершенной сессии при перезагрузке или показ стартового экрана
  */
-function restoreOrInitApp() {
+async function restoreOrInitApp() {
   if (isMobileOrTabletDevice()) {
     showScreen("screen-mobile-block");
     return;
   }
+
+  // Если есть неотправленные записи в очереди, пробуем дослать их в фоне
+  flushPendingQueue();
 
   if (isUrlTestMode) {
     const saved = loadSession();
@@ -237,6 +225,21 @@ function restoreOrInitApp() {
 
   const savedSession = loadSession();
   if (savedSession && !savedSession.isFinished) {
+    // Перед продолжением старой сессии проверяем, что доступ к Google Таблице не заблокирован
+    const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
+    if (scriptUrl) {
+      try {
+        await getGroupCountersStrict();
+      } catch (err) {
+        showScreen("screen-intro");
+        const errorBox = document.getElementById("form-error");
+        if (errorBox) {
+          errorBox.textContent = err.message;
+          errorBox.hidden = false;
+        }
+        return;
+      }
+    }
     currentSession = savedSession;
     resumeSessionState();
     return;
@@ -263,7 +266,7 @@ function resumeSessionState() {
 }
 
 /**
- * Обработка нажатия «Начать исследование»
+ * Обработка нажатия «Начать исследование» с обязательной предварительной проверкой связи с Google Таблицей
  */
 async function handleStartSubmit(event) {
   event.preventDefault();
@@ -276,6 +279,9 @@ async function handleStartSubmit(event) {
   const genderInput = document.querySelector('input[name="gender"]:checked');
   const ageInput = document.getElementById("age-input");
   const errorBox = document.getElementById("form-error");
+
+  const defaultErrorText = "Пожалуйста, укажите ваш пол и корректный возраст (от 18 до 100 лет).";
+  errorBox.textContent = defaultErrorText;
 
   const gender = genderInput ? genderInput.value : "";
   const age = ageInput ? parseInt(ageInput.value, 10) : NaN;
@@ -296,11 +302,13 @@ async function handleStartSubmit(event) {
 
   const btnStart = document.getElementById("btn-start");
   btnStart.disabled = true;
-  btnStart.textContent = "Загрузка...";
+  btnStart.textContent = "Проверка подключения к базе...";
 
   try {
-    // Определяем порядок групп (A = group_1, B = group_2) на основе счетчиков завершенных групп
-    const counts = await getGroupCounters();
+    // 1. Строгая проверка подключения к Google Таблице и чтение счетчиков групп.
+    // Если скрипт заблокирован AdBlock / uBlock / Brave / антивирусом или нет сети — выбрасывается ошибка, и тест НЕ начинается.
+    const counts = await getGroupCountersStrict();
+
     let firstGroup;
     if (counts.countA < counts.countB) {
       firstGroup = "A";
@@ -348,6 +356,10 @@ async function handleStartSubmit(event) {
 
     showScreen("screen-stimulus");
     renderCurrentTrial();
+  } catch (connectionErr) {
+    // Выводим понятное сообщение об ошибке прямо над кнопкой «Начать исследование» и НЕ запускаем тест
+    errorBox.textContent = connectionErr.message || "Не удалось подключиться к серверу сохранения данных.";
+    errorBox.hidden = false;
   } finally {
     btnStart.disabled = false;
     btnStart.textContent = "Начать исследование";
@@ -376,6 +388,7 @@ function renderCurrentTrial() {
   currentArousal = null;
   rtFirstClickMs = null;
   minTimeElapsed = false;
+  isSubmittingTrial = false;
   if (minViewTimerId) {
     clearTimeout(minViewTimerId);
     minViewTimerId = null;
@@ -385,7 +398,9 @@ function renderCurrentTrial() {
   document.querySelectorAll(".scale-btn").forEach((btn) => btn.classList.remove("selected"));
   document.getElementById("valence-selected-label").textContent = "";
   document.getElementById("arousal-selected-label").textContent = "";
-  document.getElementById("btn-next").disabled = true;
+  const btnNext = document.getElementById("btn-next");
+  btnNext.disabled = true;
+  btnNext.textContent = "Далее";
 
   // Обновление верхней панели прогресса
   const blockNum = idx < 30 ? 1 : 2;
@@ -471,14 +486,15 @@ function handleScaleSelect(scale, value) {
 function updateNextButtonState() {
   const btnNext = document.getElementById("btn-next");
   const bothSelected = currentValence !== null && currentArousal !== null;
-  btnNext.disabled = !(bothSelected && minTimeElapsed);
+  btnNext.disabled = !(bothSelected && minTimeElapsed && !isSubmittingTrial);
 }
 
 /**
  * Переход к следующему стимулу по нажатию «Далее»
+ * На 1-й картинке дополнительно дожидается успешной отправки POST-запроса в Google Таблицу.
  */
-function handleNextTrial() {
-  if (currentValence === null || currentArousal === null || !minTimeElapsed) {
+async function handleNextTrial() {
+  if (currentValence === null || currentArousal === null || !minTimeElapsed || isSubmittingTrial) {
     return;
   }
 
@@ -510,7 +526,29 @@ function handleNextTrial() {
     increment_group: incrementGroup
   };
 
-  saveTrialResponse(record);
+  // На первой картинке (trialNumber === 1) обязательно проверяем, что POST-запрос на запись проходит и не блокируется
+  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
+  if (scriptUrl && trialNumber === 1) {
+    isSubmittingTrial = true;
+    const btnNext = document.getElementById("btn-next");
+    btnNext.disabled = true;
+    btnNext.textContent = "Сохранение...";
+
+    const sentOk = await saveTrialResponse(record, true);
+    if (!sentOk) {
+      isSubmittingTrial = false;
+      btnNext.disabled = false;
+      btnNext.textContent = "Далее";
+      alert(
+        "Не удалось отправить оценку в Google Таблицу (запрос заблокирован браузером или прервалось соединение).\n\n" +
+        "Пожалуйста, отключите блокировщик рекламы (AdBlock, uBlock Origin, AdGuard, щит Brave) или проверьте интернет и нажмите «Далее» еще раз."
+      );
+      return;
+    }
+  } else {
+    // Для остальных картинок отправляем асинхронно с автоматической очередью досылки при сбоях сети
+    saveTrialResponse(record, false);
+  }
 
   currentSession.currentIndex += 1;
 
@@ -543,6 +581,7 @@ function showBreakScreen() {
   btnContinue.disabled = true;
 
   preloadImagesFrom(30, 3);
+  flushPendingQueue();
 
   if (breakIntervalId) {
     clearInterval(breakIntervalId);
@@ -601,6 +640,8 @@ function handleBreakContinue() {
  * Завершение эксперимента (после 60-й картинки)
  */
 function finishExperiment() {
+  flushPendingQueue();
+
   if (currentSession) {
     currentSession.isFinished = true;
     saveSession(currentSession);
@@ -664,9 +705,7 @@ async function playDoubleBeep() {
 
     const now = audioCtx.currentTime + 0.02;
 
-    // Первый тон: Ре второй октавы (587.33 Гц), средняя комфортная громкость 0.48
     playTone(audioCtx, 587.33, now, 0.25, 0.48);
-    // Второй тон: Соль второй октавы (783.99 Гц), средняя комфортная громкость 0.52
     playTone(audioCtx, 783.99, now + 0.28, 0.42, 0.52);
   } catch (err) {
     console.warn("Не удалось воспроизвести звуковой сигнал:", err);
@@ -738,25 +777,50 @@ function stopTabBlinking() {
 }
 
 /**
- * Получение счетчиков завершенных групп (из localStorage или Google Таблицы)
+ * СТРОГАЯ ПРОВЕРКА ПОДКЛЮЧЕНИЯ К GOOGLE ТАБЛИЦЕ ПЕРЕД СТАРТОМ
+ * Больше не переключается молча на локальный режим, если запрос заблокирован!
  */
-async function getGroupCounters() {
+async function getGroupCountersStrict() {
   const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (scriptUrl) {
-    try {
-      const response = await fetch(scriptUrl, { method: "GET" });
-      if (response.ok) {
-        const data = await response.json();
-        if (typeof data.countA === "number" && typeof data.countB === "number") {
-          return { countA: data.countA, countB: data.countB };
-        }
-      }
-    } catch (err) {
-      console.warn("Ошибка чтения счетчиков из Google Таблицы, используем локальные счетчики:", err);
-    }
+
+  // Если URL в config.js специально оставлен пустым (автономная отладка на ПК без интернета)
+  if (!scriptUrl) {
+    return getLocalCounters();
   }
 
-  return getLocalCounters();
+  const separator = scriptUrl.includes("?") ? "&" : "?";
+  const pingUrl = `${scriptUrl}${separator}check=1&t=${Date.now()}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд максимум
+
+  try {
+    const response = await fetch(pingUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Код ответа сервера: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data || data.status !== "ok" || typeof data.countA !== "number" || typeof data.countB !== "number") {
+      throw new Error("Некорректный ответ от Google Таблицы");
+    }
+
+    return { countA: data.countA, countB: data.countB };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.error("Ошибка проверки связи с Google Таблицей:", err);
+    throw new Error(
+      "Не удалось подключиться к серверу сохранения данных (доступ к Google Таблицам заблокирован вашим браузером или сетью). " +
+      "Пожалуйста, отключите блокировщик рекламы (AdBlock, uBlock Origin, AdGuard, встроенный щит в браузере Brave) или смените браузер, обновите страницу и нажмите «Начать исследование» снова."
+    );
+  }
 }
 
 function getLocalCounters() {
@@ -783,14 +847,20 @@ function incrementLocalCounter(groupName) {
 }
 
 /**
- * Сохранение ответа по одной картинке (в localStorage и при наличии URL — в Google Таблицу)
+ * Сохранение ответа по одной картинке + очередь гарантированной доставки при кратковременных сбоях сети
  */
-function saveTrialResponse(record) {
+async function saveTrialResponse(record, waitForConfirmation = false) {
+  // 1. Всегда сохраняем резервную копию в localStorage браузера
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_RESPONSES);
     const list = raw ? JSON.parse(raw) : [];
-    list.push(record);
-    localStorage.setItem(STORAGE_KEYS.LOCAL_RESPONSES, JSON.stringify(list));
+    const alreadySaved = list.some(
+      (r) => r.participant_id === record.participant_id && r.trial_number === record.trial_number
+    );
+    if (!alreadySaved) {
+      list.push(record);
+      localStorage.setItem(STORAGE_KEYS.LOCAL_RESPONSES, JSON.stringify(list));
+    }
   } catch (err) {
     console.error("Ошибка сохранения ответа в localStorage:", err);
   }
@@ -800,18 +870,87 @@ function saveTrialResponse(record) {
   }
 
   const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (scriptUrl) {
-    fetch(scriptUrl, {
+  if (!scriptUrl) {
+    return true;
+  }
+
+  // 2. Отправляем POST-запрос в Google Таблицу
+  try {
+    await sendPostToGoogleSheet(scriptUrl, record);
+    // Если отправка прошла успешно, заодно пробуем протолкнуть возможные старые записи из очереди
+    flushPendingQueue();
+    return true;
+  } catch (err) {
+    console.warn("Ошибка отправки ответа в Google Таблицу:", err);
+    if (!waitForConfirmation) {
+      enqueuePendingRecord(record);
+    }
+    return false;
+  }
+}
+
+async function sendPostToGoogleSheet(scriptUrl, record) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    await fetch(scriptUrl, {
       method: "POST",
       mode: "no-cors",
       keepalive: true,
+      signal: controller.signal,
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
       body: JSON.stringify(record)
-    }).catch((err) => {
-      console.warn("Ошибка отправки данных в Google Таблицу:", err);
     });
+    clearTimeout(timeoutId);
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/**
+ * Очередь неотправленных записей (на случай секундного обрыва Wi-Fi в середине теста)
+ */
+function enqueuePendingRecord(record) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PENDING_QUEUE);
+    const queue = raw ? JSON.parse(raw) : [];
+    const exists = queue.some(
+      (r) => r.participant_id === record.participant_id && r.trial_number === record.trial_number
+    );
+    if (!exists) {
+      queue.push(record);
+      localStorage.setItem(STORAGE_KEYS.PENDING_QUEUE, JSON.stringify(queue));
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+async function flushPendingQueue() {
+  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
+  if (!scriptUrl) return;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PENDING_QUEUE);
+    if (!raw) return;
+    const queue = JSON.parse(raw);
+    if (!Array.isArray(queue) || queue.length === 0) return;
+
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        await sendPostToGoogleSheet(scriptUrl, item);
+      } catch (err) {
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem(STORAGE_KEYS.PENDING_QUEUE, JSON.stringify(remaining));
+  } catch (e) {
+    console.warn(e);
   }
 }
 
@@ -849,7 +988,6 @@ function downloadLocalCsv() {
     ...rows.map((r) => headers.map((h) => escapeCsvCell(r[h])).join(","))
   ];
 
-  // Добавляем UTF-8 BOM (\uFEFF), чтобы Microsoft Excel корректно отображал кириллицу
   const csvContent = "\uFEFF" + csvLines.join("\r\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
