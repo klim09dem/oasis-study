@@ -1,6 +1,9 @@
 /**
  * Логика веб-приложения для нормирования стимулов по протоколу OASIS (Kurdi et al., 2017)
- * Версия с обязательной проверкой связи с Google Таблицами перед стартом и защитой от потери ответов
+ * Версия с:
+ * 1. Проверкой подключения к Google Таблицам на старте (с подсказкой про режим Инкогнито).
+ * 2. Пакетной отправкой данных блоками (после 30-й и 60-й картинки) с credentials: "omit".
+ * 3. Автоматической резервной отправкой таблицы на почту исследователя через Web3Forms, если Google Таблица не приняла блок.
  */
 
 const VALENCE_LABELS = {
@@ -28,7 +31,7 @@ const STORAGE_KEYS = {
   COMPLETED: "oasis_is_completed_v4",
   LOCAL_COUNTERS: "oasis_local_counters_v4",
   LOCAL_RESPONSES: "oasis_local_responses_v4",
-  PENDING_QUEUE: "oasis_pending_queue_v4"
+  PENDING_BATCHES: "oasis_pending_batches_v4"
 };
 
 const DEFAULT_FAVICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%232C3E50'/></svg>";
@@ -46,7 +49,7 @@ let minViewTimerId = null;
 let breakIntervalId = null;
 let titleBlinkIntervalId = null;
 let audioCtx = null;
-let isSubmittingTrial = false;
+let isSubmittingBlock = false;
 
 // Параметры URL (?test=1 и ?fast=1)
 const urlParams = new URLSearchParams(window.location.search);
@@ -209,9 +212,6 @@ async function restoreOrInitApp() {
     return;
   }
 
-  // Если есть неотправленные записи в очереди, пробуем дослать их в фоне
-  flushPendingQueue();
-
   if (isUrlTestMode) {
     const saved = loadSession();
     if (saved && saved.isAdminTest && !saved.isFinished) {
@@ -225,21 +225,6 @@ async function restoreOrInitApp() {
 
   const savedSession = loadSession();
   if (savedSession && !savedSession.isFinished) {
-    // Перед продолжением старой сессии проверяем, что доступ к Google Таблице не заблокирован
-    const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-    if (scriptUrl) {
-      try {
-        await getGroupCountersStrict();
-      } catch (err) {
-        showScreen("screen-intro");
-        const errorBox = document.getElementById("form-error");
-        if (errorBox) {
-          errorBox.textContent = err.message;
-          errorBox.hidden = false;
-        }
-        return;
-      }
-    }
     currentSession = savedSession;
     resumeSessionState();
     return;
@@ -305,8 +290,8 @@ async function handleStartSubmit(event) {
   btnStart.textContent = "Проверка подключения к базе...";
 
   try {
-    // 1. Строгая проверка подключения к Google Таблице и чтение счетчиков групп.
-    // Если скрипт заблокирован AdBlock / uBlock / Brave / антивирусом или нет сети — выбрасывается ошибка, и тест НЕ начинается.
+    // 1. Строгая проверка подключения к Google Таблице перед стартом.
+    // Если расширение браузера блокирует доступ — выводим подсказку про режим Инкогнито и не запускаем тест вхолостую.
     const counts = await getGroupCountersStrict();
 
     let firstGroup;
@@ -346,7 +331,9 @@ async function handleStartSubmit(event) {
       currentIndex: 0,
       inBreak: false,
       breakEndTime: null,
-      isFinished: false
+      isFinished: false,
+      block1Synced: false,
+      block2Synced: false
     };
 
     saveSession(currentSession);
@@ -357,7 +344,6 @@ async function handleStartSubmit(event) {
     showScreen("screen-stimulus");
     renderCurrentTrial();
   } catch (connectionErr) {
-    // Выводим понятное сообщение об ошибке прямо над кнопкой «Начать исследование» и НЕ запускаем тест
     errorBox.textContent = connectionErr.message || "Не удалось подключиться к серверу сохранения данных.";
     errorBox.hidden = false;
   } finally {
@@ -388,7 +374,7 @@ function renderCurrentTrial() {
   currentArousal = null;
   rtFirstClickMs = null;
   minTimeElapsed = false;
-  isSubmittingTrial = false;
+  isSubmittingBlock = false;
   if (minViewTimerId) {
     clearTimeout(minViewTimerId);
     minViewTimerId = null;
@@ -412,7 +398,7 @@ function renderCurrentTrial() {
   // Фоновая предзагрузка картинок i + 1 и i + 2
   preloadImagesFrom(idx + 1, 2);
 
-  // Загрузка и отображение текущего стимула (из папки images/group_1 или images/group_2)
+  // Загрузка и отображение текущего стимула
   const imgEl = document.getElementById("stimulus-image");
   const fallbackEl = document.getElementById("image-fallback");
   const fallbackTextEl = document.getElementById("image-fallback-text");
@@ -486,15 +472,16 @@ function handleScaleSelect(scale, value) {
 function updateNextButtonState() {
   const btnNext = document.getElementById("btn-next");
   const bothSelected = currentValence !== null && currentArousal !== null;
-  btnNext.disabled = !(bothSelected && minTimeElapsed && !isSubmittingTrial);
+  btnNext.disabled = !(bothSelected && minTimeElapsed && !isSubmittingBlock);
 }
 
 /**
- * Переход к следующему стимулу по нажатию «Далее»
- * На 1-й картинке дополнительно дожидается успешной отправки POST-запроса в Google Таблицу.
+ * Переход к следующему стимулу по нажатию «Далее».
+ * Оценки сохраняются мгновенно в память браузера, а на 30-й и 60-й картинке отправляются
+ * единым блоком в Google Таблицу (с автоматическим резервом на почту через Web3Forms при сбое).
  */
 async function handleNextTrial() {
-  if (currentValence === null || currentArousal === null || !minTimeElapsed || isSubmittingTrial) {
+  if (currentValence === null || currentArousal === null || !minTimeElapsed || isSubmittingBlock) {
     return;
   }
 
@@ -526,33 +513,19 @@ async function handleNextTrial() {
     increment_group: incrementGroup
   };
 
-  // На первой картинке (trialNumber === 1) обязательно проверяем, что POST-запрос на запись проходит и не блокируется
-  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (scriptUrl && trialNumber === 1) {
-    isSubmittingTrial = true;
+  // Мгновенно сохраняем ответ в локальное хранилище
+  saveRecordToLocalStorage(record);
+
+  // Если завершен Блок 1 (30-я картинка) — отправляем пакет из первых 30 оценок
+  if (trialNumber === 30) {
+    isSubmittingBlock = true;
     const btnNext = document.getElementById("btn-next");
     btnNext.disabled = true;
-    btnNext.textContent = "Сохранение...";
+    btnNext.textContent = "Сохранение блока 1...";
 
-    const sentOk = await saveTrialResponse(record, true);
-    if (!sentOk) {
-      isSubmittingTrial = false;
-      btnNext.disabled = false;
-      btnNext.textContent = "Далее";
-      alert(
-        "Не удалось отправить оценку в Google Таблицу (запрос заблокирован браузером или прервалось соединение).\n\n" +
-        "Пожалуйста, отключите блокировщик рекламы (AdBlock, uBlock Origin, AdGuard, щит Brave) или проверьте интернет и нажмите «Далее» еще раз."
-      );
-      return;
-    }
-  } else {
-    // Для остальных картинок отправляем асинхронно с автоматической очередью досылки при сбоях сети
-    saveTrialResponse(record, false);
-  }
+    await syncBlockRecords(1, 30, incrementGroup);
 
-  currentSession.currentIndex += 1;
-
-  if (currentSession.currentIndex === 30) {
+    currentSession.currentIndex = 30;
     const breakSeconds = isUrlFastMode ? 5 : (CONFIG.BREAK_DURATION_SEC || 60);
     currentSession.inBreak = true;
     currentSession.breakEndTime = Date.now() + breakSeconds * 1000;
@@ -561,11 +534,21 @@ async function handleNextTrial() {
     return;
   }
 
-  if (currentSession.currentIndex >= 60) {
+  // Если завершен Блок 2 (60-я картинка) — отправляем пакет из вторых 30 оценок
+  if (trialNumber === 60) {
+    isSubmittingBlock = true;
+    const btnNext = document.getElementById("btn-next");
+    btnNext.disabled = true;
+    btnNext.textContent = "Завершение и отправка...";
+
+    await syncBlockRecords(31, 60, incrementGroup);
+
+    currentSession.currentIndex = 60;
     finishExperiment();
     return;
   }
 
+  currentSession.currentIndex += 1;
   saveSession(currentSession);
   renderCurrentTrial();
 }
@@ -581,7 +564,6 @@ function showBreakScreen() {
   btnContinue.disabled = true;
 
   preloadImagesFrom(30, 3);
-  flushPendingQueue();
 
   if (breakIntervalId) {
     clearInterval(breakIntervalId);
@@ -640,8 +622,6 @@ function handleBreakContinue() {
  * Завершение эксперимента (после 60-й картинки)
  */
 function finishExperiment() {
-  flushPendingQueue();
-
   if (currentSession) {
     currentSession.isFinished = true;
     saveSession(currentSession);
@@ -777,13 +757,11 @@ function stopTabBlinking() {
 }
 
 /**
- * СТРОГАЯ ПРОВЕРКА ПОДКЛЮЧЕНИЯ К GOOGLE ТАБЛИЦЕ ПЕРЕД СТАРТОМ
- * Больше не переключается молча на локальный режим, если запрос заблокирован!
+ * СТРОГАЯ ПРОВЕРКА ПОДКЛЮЧЕНИЯ К GOOGLE ТАБЛИЦЕ ПЕРЕД СТАРТОМ (с советом открыть режим Инкогнито)
  */
 async function getGroupCountersStrict() {
   const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
 
-  // Если URL в config.js специально оставлен пустым (автономная отладка на ПК без интернета)
   if (!scriptUrl) {
     return getLocalCounters();
   }
@@ -792,12 +770,13 @@ async function getGroupCountersStrict() {
   const pingUrl = `${scriptUrl}${separator}check=1&t=${Date.now()}`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд максимум
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch(pingUrl, {
       method: "GET",
       cache: "no-store",
+      credentials: "omit",
       signal: controller.signal
     });
 
@@ -817,8 +796,8 @@ async function getGroupCountersStrict() {
     clearTimeout(timeoutId);
     console.error("Ошибка проверки связи с Google Таблицей:", err);
     throw new Error(
-      "Не удалось подключиться к серверу сохранения данных (доступ к Google Таблицам заблокирован вашим браузером или сетью). " +
-      "Пожалуйста, отключите блокировщик рекламы (AdBlock, uBlock Origin, AdGuard, встроенный щит в браузере Brave) или смените браузер, обновите страницу и нажмите «Начать исследование» снова."
+      "Не удалось подключиться к базе исследования (соединение блокируется расширением вашего браузера, например AdBlock или прокси). " +
+      "Чтобы ничего не настраивать, просто откройте эту ссылку в режиме «Инкогнито» (нажмите Ctrl + Shift + N на Windows или Cmd + Shift + N на Mac), где расширения отключены по умолчанию."
     );
   }
 }
@@ -847,20 +826,21 @@ function incrementLocalCounter(groupName) {
 }
 
 /**
- * Сохранение ответа по одной картинке + очередь гарантированной доставки при кратковременных сбоях сети
+ * Сохранение одной оценки в localStorage браузера
  */
-async function saveTrialResponse(record, waitForConfirmation = false) {
-  // 1. Всегда сохраняем резервную копию в localStorage браузера
+function saveRecordToLocalStorage(record) {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_RESPONSES);
     const list = raw ? JSON.parse(raw) : [];
-    const alreadySaved = list.some(
+    const existingIndex = list.findIndex(
       (r) => r.participant_id === record.participant_id && r.trial_number === record.trial_number
     );
-    if (!alreadySaved) {
+    if (existingIndex >= 0) {
+      list[existingIndex] = record;
+    } else {
       list.push(record);
-      localStorage.setItem(STORAGE_KEYS.LOCAL_RESPONSES, JSON.stringify(list));
     }
+    localStorage.setItem(STORAGE_KEYS.LOCAL_RESPONSES, JSON.stringify(list));
   } catch (err) {
     console.error("Ошибка сохранения ответа в localStorage:", err);
   }
@@ -868,43 +848,108 @@ async function saveTrialResponse(record, waitForConfirmation = false) {
   if (record.increment_group) {
     incrementLocalCounter(record.increment_group);
   }
+}
 
-  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (!scriptUrl) {
-    return true;
-  }
-
-  // 2. Отправляем POST-запрос в Google Таблицу
+/**
+ * Получение записей текущего участника за указанный диапазон (например, 1..30 или 31..60)
+ */
+function getParticipantRecordsInRange(startTrial, endTrial) {
   try {
-    await sendPostToGoogleSheet(scriptUrl, record);
-    // Если отправка прошла успешно, заодно пробуем протолкнуть возможные старые записи из очереди
-    flushPendingQueue();
-    return true;
-  } catch (err) {
-    console.warn("Ошибка отправки ответа в Google Таблицу:", err);
-    if (!waitForConfirmation) {
-      enqueuePendingRecord(record);
-    }
-    return false;
+    const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_RESPONSES);
+    const list = raw ? JSON.parse(raw) : [];
+    return list
+      .filter(
+        (r) =>
+          r.participant_id === currentSession.participantId &&
+          r.trial_number >= startTrial &&
+          r.trial_number <= endTrial
+      )
+      .sort((a, b) => a.trial_number - b.trial_number);
+  } catch (e) {
+    return [];
   }
 }
 
-async function sendPostToGoogleSheet(scriptUrl, record) {
+/**
+ * Пакетная отправка блока (30 оценок) в Google Таблицу.
+ * Если Google Таблица недоступна или заблокирована — автоматически отправляет резервную копию на почту через Web3Forms.
+ */
+async function syncBlockRecords(startTrial, endTrial, incrementGroup) {
+  const records = getParticipantRecordsInRange(startTrial, endTrial);
+  if (records.length === 0) return;
+
+  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
+  const blockLabel = endTrial === 30 ? "Блок 1 (1–30)" : "Блок 2 (31–60)";
+
+  if (scriptUrl) {
+    try {
+      await sendBatchToGoogleSheet(scriptUrl, records, incrementGroup);
+      if (endTrial === 30) currentSession.block1Synced = true;
+      if (endTrial === 60) currentSession.block2Synced = true;
+      saveSession(currentSession);
+      return;
+    } catch (sheetErr) {
+      console.warn(`Не удалось отправить ${blockLabel} в Google Таблицу, включаем резервную отправку на почту:`, sheetErr);
+    }
+  }
+
+  // Если Google Таблица не приняла блок — отправляем резервное письмо через Web3Forms
+  // (В финале после 60-й картинки отправляем сразу все 60 строк участника, если Блок 1 тоже не дошел в таблицу)
+  const recordsForEmail =
+    endTrial === 60 && !currentSession.block1Synced
+      ? getParticipantRecordsInRange(1, 60)
+      : records;
+
+  await sendBackupEmailViaWeb3Forms(recordsForEmail, blockLabel);
+}
+
+/**
+ * Отправка пакета записей в Google Таблицу (с поддержкой как нового пакетного скрипта, так и построчного)
+ */
+async function sendBatchToGoogleSheet(scriptUrl, records, incrementGroup) {
+  const payload = {
+    participant_id: currentSession.participantId,
+    increment_group: incrementGroup,
+    records: records
+  };
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
-    await fetch(scriptUrl, {
+    const response = await fetch(scriptUrl, {
       method: "POST",
-      mode: "no-cors",
-      keepalive: true,
-      signal: controller.signal,
+      credentials: "omit",
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
-      body: JSON.stringify(record)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
+
     clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const resData = await response.json();
+    if (!resData || resData.status !== "ok") {
+      throw new Error("Ответ сервера Google Таблиц не содержит status: ok");
+    }
+
+    // Если в Google Таблице еще стоит старая версия gas_backend.js (без поддержки массива records),
+    // она запишет только 1 строку (resData.written не будет равен records.length) — тогда дошлем остальные построчно:
+    if (typeof resData.written !== "number" && records.length > 1) {
+      for (const rec of records) {
+        await fetch(scriptUrl, {
+          method: "POST",
+          credentials: "omit",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(rec)
+        });
+      }
+    }
   } catch (err) {
     clearTimeout(timeoutId);
     throw err;
@@ -912,45 +957,72 @@ async function sendPostToGoogleSheet(scriptUrl, record) {
 }
 
 /**
- * Очередь неотправленных записей (на случай секундного обрыва Wi-Fi в середине теста)
+ * АВАРИЙНАЯ ОТПРАВКА ДАННЫХ НА ПОЧТУ ИССЛЕДОВАТЕЛЯ ЧЕРЕЗ WEB3FORMS
+ * Не требует от испытуемого никаких действий и не собирает его личные данные.
  */
-function enqueuePendingRecord(record) {
+async function sendBackupEmailViaWeb3Forms(records, blockLabel) {
+  const accessKey = (CONFIG.WEB3FORMS_ACCESS_KEY || "").trim();
+  if (!accessKey || !records || records.length === 0) return false;
+
+  const headers = [
+    "timestamp",
+    "participant_id",
+    "gender",
+    "age",
+    "first_group",
+    "current_group",
+    "trial_number",
+    "image_name",
+    "valence",
+    "arousal",
+    "rt_first_click_ms"
+  ];
+
+  // Формат с разделителем ТАБУЛЯЦИЯ (TSV) — можно просто скопировать из письма и нажать Ctrl+V в ячейку A Google Таблицы!
+  const tsvLines = [
+    headers.join("\t"),
+    ...records.map((r) => headers.map((h) => (r[h] !== undefined && r[h] !== null ? String(r[h]) : "")).join("\t"))
+  ];
+
+  // Классический CSV-формат через запятую
+  const csvLines = [
+    headers.join(","),
+    ...records.map((r) => headers.map((h) => (r[h] !== undefined && r[h] !== null ? String(r[h]) : "")).join(","))
+  ];
+
+  const participantId = currentSession ? currentSession.participantId : "Unknown";
+  const gender = currentSession ? currentSession.gender : "";
+  const age = currentSession ? currentSession.age : "";
+
+  const messageBody =
+    `Автоматическая резервная выгрузка данных исследования OASIS.\n` +
+    `Участник: ${participantId} (${gender}, возраст: ${age})\n` +
+    `Блок: ${blockLabel} (количество строк: ${records.length})\n\n` +
+    `=== ВАРИАНТ 1: ДЛЯ ПРЯМОЙ ВСТАВКИ В GOOGLE ТАБЛИЦУ (ТАБУЛЯЦИЯ) ===\n` +
+    `(Скопируйте строки ниже без заголовка и нажмите Ctrl+V в первую свободную ячейку столбца A на листе Responses)\n\n` +
+    tsvLines.join("\n") +
+    `\n\n=== ВАРИАНТ 2: СТАНДАРТНЫЙ CSV (ЧЕРЕЗ ЗАПЯТУЮ) ===\n\n` +
+    csvLines.join("\n");
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PENDING_QUEUE);
-    const queue = raw ? JSON.parse(raw) : [];
-    const exists = queue.some(
-      (r) => r.participant_id === record.participant_id && r.trial_number === record.trial_number
-    );
-    if (!exists) {
-      queue.push(record);
-      localStorage.setItem(STORAGE_KEYS.PENDING_QUEUE, JSON.stringify(queue));
-    }
-  } catch (e) {
-    console.warn(e);
-  }
-}
+    const response = await fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        subject: `OASIS Резервная копия: ${participantId} — ${blockLabel} (${records.length} строк)`,
+        from_name: "OASIS Study Backup",
+        message: messageBody
+      })
+    });
 
-async function flushPendingQueue() {
-  const scriptUrl = (CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (!scriptUrl) return;
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PENDING_QUEUE);
-    if (!raw) return;
-    const queue = JSON.parse(raw);
-    if (!Array.isArray(queue) || queue.length === 0) return;
-
-    const remaining = [];
-    for (const item of queue) {
-      try {
-        await sendPostToGoogleSheet(scriptUrl, item);
-      } catch (err) {
-        remaining.push(item);
-      }
-    }
-    localStorage.setItem(STORAGE_KEYS.PENDING_QUEUE, JSON.stringify(remaining));
-  } catch (e) {
-    console.warn(e);
+    return response.ok;
+  } catch (err) {
+    console.warn("Ошибка резервной отправки через Web3Forms:", err);
+    return false;
   }
 }
 

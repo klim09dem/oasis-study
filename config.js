@@ -2,10 +2,13 @@ const CONFIG = {
   // Ссылка на развернутый веб-скрипт Google Таблицы:
   GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxJoNsQeQgdDl9mkkQx1JzoEXspOWRZSrfL5u0ZikKmGHBpaykyi2ZiXmThJlJ-5vis/exec",
 
+  // Ключ резервной отправки данных на почту через Web3Forms (срабатывает автоматически, если Google Таблица недоступна):
+  WEB3FORMS_ACCESS_KEY: "76c26fd2-aa7d-48ad-9a63-16cf8458c507",
+
   BREAK_DURATION_SEC: 60, // 1 минута (60 сек)
   MIN_VIEW_TIME_MS: 1500, // 1,5 секунды (1500 мс) до разблокировки кнопки "Далее"
 
-  // Группа 1 (папка images/group_1/) — основное расширение .jpg (чтобы не было 404 в консоли)
+  // Группа 1 (папка images/group_1/) — основное расширение .jpg
   GROUP_A: [
     "Bed 1.jpg", "Bird 3.jpg", "Bloody knife 1.jpg", "Boxing 2.jpg",
     "Bubble 2.jpg", "Cotton swabs 2.jpg", "Depressed face 1.jpg", "Depressed pose 1.jpg",
