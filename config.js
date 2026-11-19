@@ -1,6 +1,6 @@
 const CONFIG = {
   // Ссылка на развернутый веб-скрипт Google Таблицы:
-  GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxJoNsQeQgdDl9mkkQx1JzoEXspOWRZSrfL5u0ZikKmGHBpaykyi2ZiXmThJlJ-5vis/exec",
+  GOOGLE_SCRIPT_URL: "1https://script.google.com/macros/s/AKfycbxJoNsQeQgdDl9mkkQx1JzoEXspOWRZSrfL5u0ZikKmGHBpaykyi2ZiXmThJlJ-5vis/exec",
 
   // Ключ резервной отправки данных на почту через Web3Forms (срабатывает автоматически, если Google Таблица недоступна):
   WEB3FORMS_ACCESS_KEY: "76c26fd2-aa7d-48ad-9a63-16cf8458c507",
